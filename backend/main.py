@@ -1,60 +1,71 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List
+from googleapiclient.discovery import build
+import random
+import os
 
 app = FastAPI()
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Frontend URL
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Sample data for testing
-SAMPLE_MOVIES = [
-    {
-        "id": 1,
-        "title": "Inception",
-        "overview": "A thief who steals corporate secrets through dream-sharing technology.",
-        "genre": "Sci-Fi",
-        "rating": 8.8,
-        "trailer_url": "https://www.youtube.com/embed/YoHD9XEInc0"
-    },
-    {
-        "id": 2,
-        "title": "The Dark Knight",
-        "overview": "Batman fights the menace known as the Joker.",
-        "genre": "Action",
-        "rating": 9.0,
-        "trailer_url": "https://www.youtube.com/embed/EXeTwQWrcwY"
-    }
-]
+# Get API key from environment variable
+YOUTUBE_API_KEY = os.getenv('YOUTUBE_API_KEY')
+if not YOUTUBE_API_KEY:
+    raise ValueError("YOUTUBE_API_KEY environment variable is not set")
 
-class Movie(BaseModel):
-    id: int
-    title: str
-    overview: str
-    genre: str
-    rating: float
-    trailer_url: str
+youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
 
-@app.get("/")
-def read_root():
-    return {"message": "Movie API is running!"}
+@app.get("/videos/next")
+async def get_next_video():
+    try:
+        # Search for movie reviews or trailers
+        search_response = youtube.search().list(
+            q="movie review",  # You can change this search term
+            part="id,snippet",
+            maxResults=50,
+            type="video",
+            videoDuration="medium"  # Only medium length videos (4-20 mins)
+        ).execute()
 
-@app.get("/movies/next", response_model=Movie)
-async def get_next_movie():
-    # For testing, just return the first movie
-    return SAMPLE_MOVIES[0]
+        if not search_response.get('items'):
+            return {"error": "No videos found"}
 
-@app.get("/movies", response_model=List[Movie])
-async def get_movies():
-    return SAMPLE_MOVIES
+        # Randomly select one video
+        video = random.choice(search_response['items'])
+        video_id = video['id']['videoId']
 
-@app.post("/swipes")
-async def create_swipe(movie_id: int, liked: bool):
-    return {"status": "success", "liked": liked, "movie_id": movie_id}
+        # Get additional video details
+        video_response = youtube.videos().list(
+            part="statistics,contentDetails",
+            id=video_id
+        ).execute()
+
+        video_details = video_response['items'][0]
+
+        return {
+            "id": video_id,
+            "title": video['snippet']['title'],
+            "description": video['snippet']['description'],
+            "thumbnail": video['snippet']['thumbnails']['high']['url'],
+            "embed_url": f"https://www.youtube.com/embed/{video_id}",
+            "channel_title": video['snippet']['channelTitle'],
+            "view_count": video_details['statistics'].get('viewCount', 0),
+            "like_count": video_details['statistics'].get('likeCount', 0),
+            "duration": video_details['contentDetails']['duration']
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/videos/{video_id}/like")
+async def like_video(video_id: str):
+    return {"status": "success"}
+
+@app.post("/videos/{video_id}/dislike")
+async def dislike_video(video_id: str):
+    return {"status": "success"}

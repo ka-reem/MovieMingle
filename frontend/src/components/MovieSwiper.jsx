@@ -1,118 +1,142 @@
 import React, { useState, useEffect } from 'react';
 
-const MovieSwiper = () => {
-  const [currentMovie, setCurrentMovie] = useState(null);
-  const [likedMovies, setLikedMovies] = useState([]);
+const VideoSwiper = () => {
+  const [currentVideo, setCurrentVideo] = useState(null);
+  const [likedVideos, setLikedVideos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    // Fetch a movie when component mounts
-    fetchNextMovie();
-  }, []);
-
-  const fetchNextMovie = async () => {
+  const fetchNextVideo = async () => {
+    setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/movies/next');
-      const movie = await response.json();
-      setCurrentMovie(movie);
+      const response = await fetch('http://localhost:8000/videos/next');
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      setCurrentVideo(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
       setLoading(false);
-    } catch (error) {
-      console.error('Error fetching movie:', error);
     }
   };
 
-  const handleSwipe = (liked) => {
-    if (liked) {
-      setLikedMovies([...likedMovies, currentMovie]);
+  useEffect(() => {
+    fetchNextVideo();
+  }, []);
+
+  const handleSwipe = async (liked) => {
+    if (!currentVideo) return;
+
+    try {
+      // Record the like/dislike
+      await fetch(`http://localhost:8000/videos/${currentVideo.id}/${liked ? 'like' : 'dislike'}`, {
+        method: 'POST'
+      });
+
+      if (liked) {
+        setLikedVideos(prev => [...prev, currentVideo]);
+      }
+
+      // Get next video
+      fetchNextVideo();
+    } catch (err) {
+      setError('Failed to record preference');
     }
-    fetchNextMovie();
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-md mx-auto mt-8 p-4 bg-red-50 rounded-lg">
+        <p className="text-red-500">{error}</p>
+        <button 
+          onClick={fetchNextVideo}
+          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          Try Again
+        </button>
+      </div>
+    );
   }
 
   return (
-    <div className="container">
-      {currentMovie && (
-        <div className="movie-card">
-          <h2>{currentMovie.title}</h2>
-          <p>{currentMovie.overview}</p>
-          <div>
-            <p>Genre: {currentMovie.genre}</p>
-            <p>Rating: {currentMovie.rating}/10</p>
-          </div>
-          {currentMovie.trailer_url && (
+    <div className="max-w-2xl mx-auto p-4">
+      {currentVideo && (
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+          {/* Video Player */}
+          <div className="relative pt-[56.25%]">
             <iframe
-              src={currentMovie.trailer_url}
-              width="100%"
-              height="315"
-              frameBorder="0"
+              src={currentVideo.embed_url}
+              className="absolute top-0 left-0 w-full h-full"
               allowFullScreen
+              frameBorder="0"
             />
-          )}
-          <div className="button-container">
-            <button onClick={() => handleSwipe(false)}>👎 Dislike</button>
-            <button onClick={() => handleSwipe(true)}>👍 Like</button>
+          </div>
+
+          {/* Video Info */}
+          <div className="p-4">
+            <h2 className="text-xl font-bold mb-2">{currentVideo.title}</h2>
+            <p className="text-gray-600 mb-2">{currentVideo.channel_title}</p>
+            <div className="flex items-center text-sm text-gray-500 mb-4">
+              <span>{parseInt(currentVideo.view_count).toLocaleString()} views</span>
+              <span className="mx-2">•</span>
+              <span>{parseInt(currentVideo.like_count).toLocaleString()} likes</span>
+            </div>
+            <p className="text-gray-700">{currentVideo.description}</p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-center gap-4 p-4 border-t">
+            <button
+              onClick={() => handleSwipe(false)}
+              className="px-6 py-3 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+            >
+              Skip
+            </button>
+            <button
+              onClick={() => handleSwipe(true)}
+              className="px-6 py-3 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors"
+            >
+              Like
+            </button>
           </div>
         </div>
       )}
-      
-      {likedMovies.length > 0 && (
-        <div className="liked-movies">
-          <h3>Liked Movies:</h3>
-          <ul>
-            {likedMovies.map(movie => (
-              <li key={movie.id}>{movie.title}</li>
+
+      {/* Liked Videos List */}
+      {likedVideos.length > 0 && (
+        <div className="mt-8 bg-white rounded-lg shadow p-4">
+          <h3 className="text-lg font-bold mb-4">Videos You Liked:</h3>
+          <div className="space-y-4">
+            {likedVideos.map(video => (
+              <div key={video.id} className="flex items-center gap-4">
+                <img
+                  src={video.thumbnail}
+                  alt={video.title}
+                  className="w-24 h-16 object-cover rounded"
+                />
+                <div>
+                  <h4 className="font-medium">{video.title}</h4>
+                  <p className="text-sm text-gray-500">{video.channel_title}</p>
+                </div>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       )}
-
-      <style jsx>{`
-        .container {
-          max-width: 600px;
-          margin: 0 auto;
-          padding: 20px;
-        }
-
-        .movie-card {
-          border: 1px solid #ddd;
-          border-radius: 8px;
-          padding: 20px;
-          margin-bottom: 20px;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .button-container {
-          display: flex;
-          justify-content: center;
-          gap: 20px;
-          margin-top: 20px;
-        }
-
-        button {
-          padding: 10px 20px;
-          border: none;
-          border-radius: 20px;
-          cursor: pointer;
-          font-size: 16px;
-          transition: transform 0.1s;
-        }
-
-        button:hover {
-          transform: scale(1.05);
-        }
-
-        .liked-movies {
-          margin-top: 20px;
-          padding: 20px;
-          border: 1px solid #ddd;
-          border-radius: 8px;
-        }
-      `}</style>
     </div>
   );
 };
 
-export default MovieSwiper;
+export default VideoSwiper;

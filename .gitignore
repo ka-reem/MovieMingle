@@ -1,3 +1,12 @@
+
+node_modules/
+
+
+
+
+
+# pre-made .gitignore for pyhton ––––
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
