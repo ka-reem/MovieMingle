@@ -1,9 +1,9 @@
-import VideoSwiper from './components/MovieSwiper'
+import MovieSwiper from './components/MovieSwiper'
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-100 py-8">
-      <VideoSwiper />
+    <div className="min-h-screen bg-gray-100 w-full">
+      <MovieSwiper />
     </div>
   )
 }
