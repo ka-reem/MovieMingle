@@ -3,8 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from googleapiclient.discovery import build
 import random
 import os
-from datetime import datetime, timedelta
-import isodate  # for parsing YouTube duration
+import isodate
 
 app = FastAPI()
 
@@ -17,54 +16,33 @@ app.add_middleware(
 )
 
 YOUTUBE_API_KEY = os.getenv('YOUTUBE_API_KEY')
-if not YOUTUBE_API_KEY:
-    raise ValueError("YOUTUBE_API_KEY environment variable is not set")
-
 youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
 
-def is_short_duration(duration_str):
-    """Check if video duration is under 2.5 minutes"""
-    duration = isodate.parse_duration(duration_str)
-    return duration.total_seconds() <= 150  # 150 seconds = 2.5 minutes
+# Cache to store video results
+video_cache = []
 
 @app.get("/videos/next")
 async def get_next_video():
+    global video_cache
     try:
-        # Search for short videos, including Shorts
-        search_response = youtube.search().list(
-            q="movie scene OR movie clip OR movie shorts",  # Search terms
-            part="id,snippet",
-            maxResults=50,  # Get more results to filter
-            type="video",
-            videoDuration="short",  # Only short videos
-            order="relevance",      # Get relevant results
-            # Add Shorts to results
-            videoType="any"
-        ).execute()
-
-        if not search_response.get('items'):
-            return {"error": "No videos found"}
-
-        valid_videos = []
-        
-        # Get detailed info for each video to check exact duration
-        for item in search_response['items']:
-            video_id = item['id']['videoId']
-            video_response = youtube.videos().list(
-                part="contentDetails,statistics",
-                id=video_id
+        # If cache is empty, fetch new videos
+        if not video_cache:
+            search_response = youtube.search().list(
+                q="movie clip",
+                part="id,snippet",
+                maxResults=10,  # Reduced from 50 to 10
+                type="video",
+                videoDuration="short",
+                fields="items(id/videoId,snippet(title,description,thumbnails/high,channelTitle))"  # Specify only needed fields
             ).execute()
 
-            if video_response['items']:
-                duration = video_response['items'][0]['contentDetails']['duration']
-                if is_short_duration(duration):
-                    valid_videos.append((item, video_response['items'][0]))
+            if search_response.get('items'):
+                video_cache = search_response['items']
+            else:
+                return {"error": "No videos found"}
 
-        if not valid_videos:
-            return {"error": "No videos found within duration limit"}
-
-        # Randomly select one of the valid videos
-        video, video_details = random.choice(valid_videos)
+        # Get and remove a random video from cache
+        video = video_cache.pop(random.randint(0, len(video_cache) - 1))
         
         return {
             "id": video['id']['videoId'],
@@ -73,9 +51,8 @@ async def get_next_video():
             "thumbnail": video['snippet']['thumbnails']['high']['url'],
             "embed_url": f"https://www.youtube.com/embed/{video['id']['videoId']}",
             "channel_title": video['snippet']['channelTitle'],
-            "view_count": video_details['statistics'].get('viewCount', 0),
-            "like_count": video_details['statistics'].get('likeCount', 0),
-            "duration": video_details['contentDetails']['duration']
+            "view_count": "N/A",  # Lower API usage rates
+            "like_count": "N/A"   
         }
 
     except Exception as e:
