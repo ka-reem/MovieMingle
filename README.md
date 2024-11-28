@@ -1,54 +1,52 @@
-First, set up the YouTube Data API:
+### Backend Setup
 
-bashCopy# Install required packages
-pip install google-api-python-client fastapi sqlalchemy psycopg2-binary
+1. Create a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
 
-# Get YouTube API key:
-1. Go to https://console.cloud.google.com
-2. Create a new project
-3. Enable YouTube Data API v3
-4. Create credentials (API key)
+2. Install dependencies:
+```bash
+pip install fastapi uvicorn google-api-python-client
+```
 
-To get a channel ID:
+3. Set up your YouTube API key:
+```bash
+export YOUTUBE_API_KEY="your_api_key_here"
+```
 
-
-Go to any YouTube channel
-Click "About"
-Click "Share"
-Copy the channel ID
-
-
-Features implemented:
-
-
-Fetch videos from any YouTube channel
-Store video metadata in database
-Random video selection
-Channel video browsing
-Video player with controls
-Thumbnail grid view
-
-
-Legal compliance:
-
-
-Uses official YouTube API
-Proper video embedding
-Respects YouTube's terms of service
-No content extraction
-
-
-To run the system:
-
-bashCopy# Set up environment variables
-export YOUTUBE_API_KEY="your_key_here"
-
-# Initialize database
-createdb videodb
-alembic upgrade head
-
-# Run backend
+4. Start the backend server:
+```bash
 uvicorn main:app --reload
+```
 
-# Run frontend (in another terminal)
+### Frontend Setup
+
+1. Navigate to the frontend directory:
+```bash
+cd frontend
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Start the development server:
+```bash
 npm run dev
+```
+
+4. Open your browser and go to `http://localhost:5173`
+
+
+### Backend
+- FastAPI (Python)
+- YouTube Data API v3
+- Groq & Llama (Soon)
+
+### Frontend
+- React
+- Tailwind CSS
+- Vite
