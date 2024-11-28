@@ -8,7 +8,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 2. Install dependencies:
 ```bash
-pip install fastapi uvicorn google-api-python-client
+pip install -r requirements.txt
 ```
 
 3. Set up your YouTube API key:
