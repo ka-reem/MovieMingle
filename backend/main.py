@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from googleapiclient.discovery import build
 import random
 import os
-import isodate
 
 app = FastAPI()
 
@@ -18,31 +17,61 @@ app.add_middleware(
 YOUTUBE_API_KEY = os.getenv('YOUTUBE_API_KEY')
 youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
 
-# Cache to store video results
-video_cache = []
+SEARCH_TERMS = [
+    "movie scene compilation",
+    "best movie moments",
+    "funny movie clips",
+    "action movie scenes",
+    "movie fight scenes",
+    "movie chase scenes",
+    "emotional movie scenes",
+    "classic movie clips",
+    "movie shorts",
+    "movie bloopers",
+    "behind the scenes movie",
+    "movie montage",
+    "movie clip shorts",
+    "epic movie moments",
+    "movie scene reaction",
+    "iconic film scenes",
+    "movie highlights shorts",
+    "great movie scenes",
+    "movie scene breakdown",
+    "unforgettable movie moments"
+]
+
+SORT_OPTIONS = [
+    'date',
+    'rating',
+    'relevance',
+    'viewCount',
+    'title'
+]
 
 @app.get("/videos/next")
 async def get_next_video():
-    global video_cache
     try:
-        # If cache is empty, fetch new videos
-        if not video_cache:
-            search_response = youtube.search().list(
-                q="movie clip",
-                part="id,snippet",
-                maxResults=10,  # Reduced from 50 to 10
-                type="video",
-                videoDuration="short",
-                fields="items(id/videoId,snippet(title,description,thumbnails/high,channelTitle))"  # Specify only needed fields
-            ).execute()
+        search_term = random.choice(SEARCH_TERMS)
+        sort_order = random.choice(SORT_OPTIONS)
+        
+        search_response = youtube.search().list(
+            q=search_term,
+            part="id,snippet",
+            maxResults=1,
+            type="video",
+            videoDuration="short",
+            order=sort_order,
+            safeSearch="moderate",
+            relevanceLanguage="en",  # English language results
+            regionCode="US",         # US region content
+            fields="items(id/videoId,snippet(title,description,thumbnails/high,channelTitle))",
+            publishedAfter="2015-01-01T00:00:00Z"
+        ).execute()
 
-            if search_response.get('items'):
-                video_cache = search_response['items']
-            else:
-                return {"error": "No videos found"}
-
-        # Get and remove a random video from cache
-        video = video_cache.pop(random.randint(0, len(video_cache) - 1))
+        if not search_response.get('items'):
+            return {"error": "No videos found"}
+            
+        video = search_response['items'][0]
         
         return {
             "id": video['id']['videoId'],
@@ -50,9 +79,7 @@ async def get_next_video():
             "description": video['snippet']['description'],
             "thumbnail": video['snippet']['thumbnails']['high']['url'],
             "embed_url": f"https://www.youtube.com/embed/{video['id']['videoId']}",
-            "channel_title": video['snippet']['channelTitle'],
-            "view_count": "N/A",  # Lower API usage rates
-            "like_count": "N/A"   
+            "channel_title": video['snippet']['channelTitle']
         }
 
     except Exception as e:
